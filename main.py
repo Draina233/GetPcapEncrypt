@@ -623,6 +623,7 @@ class PCAPParserApp:
                 file.write(self.txt_result.get(1.0, tk.END))
             self.status.config(text="结果已保存")
 
+
     def save_sample(self):
         if self.encrypted_data:
             file_path = filedialog.asksaveasfilename(defaultextension=".bin", filetypes=[("二进制文件", "*.bin")])
