@@ -445,7 +445,7 @@ class PCAPParserApp:
             '-T', 'fields',
             '-e', 'esp.spi',
             '-e', 'esp.seq',
-            '-e', 'esp.encrypted_data',
+            '-e', 'esp',
             '-e', 'ip.src',
             '-e', 'ip.dst'
         ]
@@ -503,13 +503,6 @@ class PCAPParserApp:
         else:
             self.txt_result.insert(tk.END, "未找到匹配的加密数据。\n")
 
-        # 更新统计信息（新增ESP统计）
-        esp_count = sum(1 for e in self.encrypted_data if e['proto'] == 'ESP')
-        tls_count = sum(1 for e in self.encrypted_data if e['proto'] == 'TLS')
-        status_text = (f"解析完成: {len(self.encrypted_data)}条数据 (TLS: {tls_count}, ESP: {esp_count}) | "
-                       f"{len(self.cipher_suite_info)}套件 | {len(self.certificates)}证书")
-        self.status.config(text=status_text)
-
         seen_ciphers = set()
         current_filter = self.ip_filter
         if current_filter:
@@ -526,7 +519,11 @@ class PCAPParserApp:
         cipher_count = len(seen_ciphers)
         cert_count = len(self.seen_cert_hashes)
         encrypted_count = len(self.encrypted_data)
-        status_text = f"解析完成，共{encrypted_count}条密文数据，{cipher_count}组密码套件，{cert_count}个证书"
+        # 更新统计信息（新增ESP统计）
+        esp_count = sum(1 for e in self.encrypted_data if e['proto'] == 'ESP')
+        tls_count = sum(1 for e in self.encrypted_data if e['proto'] == 'TLS')
+        status_text = (f"解析完成: {encrypted_count}条数据 (TLS: {tls_count}, ESP: {esp_count}) | "
+                       f"{cipher_count}组套件 | {cert_count}张证书")
         self.status.config(text=status_text)
 
     def show_combined_info(self):
