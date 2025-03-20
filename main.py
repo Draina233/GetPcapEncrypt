@@ -444,8 +444,8 @@ class PCAPParserApp:
             '-Y', f'esp&&{display_filter}',
             '-T', 'fields',
             '-e', 'esp.spi',
-            '-e', 'esp.seq',
-            '-e', 'esp',
+            '-e', 'esp.sequence',
+            '-e', 'udp.payload',
             '-e', 'ip.src',
             '-e', 'ip.dst'
         ]
@@ -461,6 +461,10 @@ class PCAPParserApp:
                 spi = int(spi_hex.strip().replace('0x', ''), 16) if spi_hex.strip() else 0
                 seq = int(seq_hex.strip().replace('0x', ''), 16) if seq_hex.strip() else 0
                 data = bytes.fromhex(data_hex.replace(':', '')) if data_hex else b''
+                if len(data) >= 16:
+                    truncated_data = data[16:]
+                else:
+                    truncated_data = ""  # 或抛出异常
 
                 self.encrypted_data.append({
                     'proto': 'ESP',
@@ -468,7 +472,7 @@ class PCAPParserApp:
                     'seq': seq,
                     'src_ip': src_ip,
                     'dst_ip': dst_ip,
-                    'data': data
+                    'data': truncated_data
                 })
             except ValueError as e:
                 print(f"解析ESP数据失败: {e}")
