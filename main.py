@@ -451,6 +451,7 @@ class PCAPParserApp:
         ]
         lines = self.run_tshark_command(command)
 
+
         for line in lines:
             parts = line.split('\t')
             if len(parts) != 5:
