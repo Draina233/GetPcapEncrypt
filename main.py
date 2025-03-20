@@ -80,6 +80,7 @@ SIG_ALG_MAPPING = {
     b'\x06\x05\x2b\x0e\x03\x02\x1d': 'sha256withrsaencryption',
     b'\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x01\x0b': 'sha256withrsa',
     b'\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x01': 'sm3withsm2',
+    b'\x06\x08*\x81\x1c\xcfU\x01\x83u':'sm3withsm2',
     b'\x06\x05\x2b\x0e\x03\x02\x1c': 'sha224withrsa',
     b'\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x01\x0c': 'sha512withrsa',
     b'\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x01\x0d': 'sha3-384withrsa',
@@ -297,12 +298,83 @@ class PCAPParserApp:
                     esp_filter = f"({esp_filter})&&({'&&'.join(base_filter)})"
                 self.process_esp_data(file_path, esp_filter)
 
+            # 处理IKE相关数据（为ESP补充证书(套件抓不到，先写着吧)）
+            if self.selected_protocols["ESP"]:
+                ike_filter = "isakmp"
+                if base_filter:
+                    ike_filter = f"({ike_filter})&&({'&&'.join(base_filter)})"
+                self.process_ike_data(file_path, ike_filter)
+
             self.root.after(0, self.show_result)
             self.root.after(0, self.show_combined_info)
         except Exception as e:
             self.root.after(0, self.show_error, str(e))
         finally:
             self.processing = False
+
+    def process_ike_data(self, file_path, display_filter):
+        """处理IKE协商的加密套件和证书 套件没法处理 占位先"""
+        self.process_ike_certificates(file_path, display_filter)
+        #self.process_ike_ciphersuites(file_path, display_filter)
+
+    def process_ike_certificates(self, file_path, display_filter):
+        """提取IKE证书"""
+        command = [
+            self.tshark_path,
+            '-r', file_path,
+            '-Y', f'isakmp.cert.data&&{display_filter}',
+            '-T', 'fields',
+            '-e', 'ip.src',
+            '-e', 'ip.dst',
+            '-e', 'udp.payload'
+        ]
+        lines = self.run_tshark_command(command)
+
+        for line in lines:
+            parts = line.split('\t')
+            if len(parts) < 3:
+                continue
+            src_ip, dst_ip, certs_hex = parts
+            try:
+                # 将udp.payload转换为字节流
+                payload_bytes = bytes.fromhex(certs_hex.replace(':', ''))
+                cert_list = []
+
+                # 遍历字节流，查找证书的开始标志3082
+                index = 0
+                while index < len(payload_bytes):
+                    # 查找3082的起始位置
+                    if index + 1 < len(payload_bytes) and payload_bytes[index] == 0x30 and payload_bytes[
+                        index + 1] == 0x82:
+                        # 向前取两字节为证书报文总长度（单位为字节）
+                        if index + 3 < len(payload_bytes):
+                            length_bytes = payload_bytes[index + 2:index + 4]
+                            cert_length = (length_bytes[0] << 8) | length_bytes[1]
+                        else:
+                            cert_length = 0  # 如果长度不足，设置默认值
+
+                        # 计算证书的结束位置
+                        cert_end = index + 4 + cert_length  # 4是3082和长度占用的字节数
+                        # 提取证书数据
+                        cert_data = payload_bytes[index:cert_end]
+                        # 将3082前面的字节全部消除，作为证书16进制字符串
+                        cert_hex = cert_data.hex().upper()
+                        # 添加到证书列表
+                        cert_list.append(cert_hex)
+
+                        # 更新索引到证书结束位置
+                        index = cert_end
+                    else:
+                        # 如果当前字节不是3082的起始字节，继续遍历
+                        index += 1
+
+                # 处理提取到的证书
+                for cert_hex in cert_list:
+                    cert_der = bytes.fromhex(cert_hex)
+                    self.process_single_cert(cert_der, src_ip, dst_ip)
+
+            except ValueError:
+                continue
 
     def process_tls_data(self, file_path, display_filter):
         # 处理应用数据
@@ -378,7 +450,6 @@ class PCAPParserApp:
             if len(parts) < 3:
                 continue
             src_ip, dst_ip, suite = parts
-            # 修改点：直接存储原始IP顺序
             self.cipher_suite_info.append((src_ip, dst_ip, suite))
 
         for line in lines:
@@ -426,6 +497,7 @@ class PCAPParserApp:
             sig_alg = cert['signature_algorithm']['algorithm']
             oid_bytes = sig_alg.dump()
             sig_name = SIG_ALG_MAPPING.get(oid_bytes, "未知算法")
+            print(oid_bytes)
         except Exception as e:
             sig_name = f"解析失败: {str(e)}"
 
