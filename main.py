@@ -4,8 +4,7 @@ import subprocess
 import os
 import hashlib
 import threading
-from collections import defaultdict
-from asn1crypto import x509  # 需要安装asn1crypto包
+from asn1crypto import x509
 
 # 密码套件映射表
 cipher_suite_mapping = {
