@@ -4,6 +4,7 @@ import subprocess
 import os
 import hashlib
 import threading
+from collections import defaultdict
 from asn1crypto import x509
 
 # 密码套件映射表
