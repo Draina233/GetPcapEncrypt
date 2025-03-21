@@ -9,10 +9,10 @@ Obtain encryption data, cipher suites, and certificate information from pcap pac
 Support TLS protocol family (including TLCP), IPsec ESP (certificate resolution supports isakmp v1)  
   
 ### 使用前准备：
-安装wireshark，保证tshark目录为D:/wireshark/tshark.exe  
-或将tshark添加至环境变量  
-Install wireshark and make sure that the tshark directory is D:/wireshark/tshark.exe  
-Or add tshark to an environment variable 
+保证tshark相对路径为/wireshark/tshark.exe
+或将tshark添加至环境变量
+Ensure that the relative path of tshark is/wireshark/tshark.exe (configured after decompression)
+Or add tshark to the environment variable
   
 ### 使用示例： 
 ![image](https://github.com/user-attachments/assets/f3074c17-0c4f-46c8-9497-eba355ba0e25)
