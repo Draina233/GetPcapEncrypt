@@ -265,6 +265,10 @@ class PCAPParserApp:
         self.sessions = {}
         self.tcp_streams = {}
         self.seen_cert_hashes = set()  # 重置证书哈希集合
+        self.selected_protocols = {
+            "TLS": self.tls_var.get(),
+            "ESP": self.esp_var.get()
+        }
         threading.Thread(
             target=self.process_pcap,
             args=(file_path,),
@@ -537,7 +541,7 @@ class PCAPParserApp:
                 if len(data) >= 16:
                     truncated_data = data[16:]
                 else:
-                    truncated_data = ""  # 或抛出异常
+                    continue
 
                 self.encrypted_data.append({
                     'proto': 'ESP',
@@ -614,7 +618,7 @@ class PCAPParserApp:
             filtered_ips = (current_filter[0], current_filter[1])  # 保持原始顺序
 
         # 密码套件信息处理（保持原始顺序）
-        output.append("=== 密码套件信息 ===")
+        output.append("=== 密码套件信息(仅TLS) ===")
         for src_ip, dst_ip, cs in self.cipher_suite_info:
             # 应用IP过滤（考虑双向）
             if current_filter:
