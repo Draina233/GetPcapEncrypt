@@ -1,3 +1,4 @@
+import json
 import tkinter as tk
 from tkinter import ttk, filedialog, scrolledtext
 import subprocess
@@ -5,6 +6,7 @@ import os
 import hashlib
 import threading
 from collections import defaultdict
+import socket
 from asn1crypto import x509
 
 # 密码套件映射表
@@ -517,31 +519,37 @@ class PCAPParserApp:
         command = [
             self.tshark_path,
             '-r', file_path,
-            '-Y', f'esp&&{display_filter}',
-            '-T', 'fields',
-            '-e', 'esp.spi',
-            '-e', 'esp.sequence',
-            '-e', 'udp.payload',
-            '-e', 'ip.src',
-            '-e', 'ip.dst'
+            '-Y', f'esp && {display_filter}',
+            '-T', 'jsonraw'
         ]
-        lines = self.run_tshark_command(command)
+        json_output = self.run_tshark_command(command)
 
+        try:
+            json_str = ''.join(json_output)
+            packets = json.loads(json_str)
+        except json.JSONDecodeError as e:
+            print(f"JSON解析失败: {e}")
+            return
 
-        for line in lines:
-            parts = line.split('\t')
-            if len(parts) != 5:
-                continue
-            spi_hex, seq_hex, data_hex, src_ip, dst_ip = parts
+        for packet in packets:
+            layers = packet.get("_source", {}).get("layers", {})
+            esp_layer = layers.get("esp", {})
+            ip_layer = layers.get("ip", {})
+            esp_raw = layers.get("esp_raw", [""])[0]
+
+            # 提取原始十六进制字符串
+            spi_hex = esp_layer.get("esp.spi_raw", [""])[0]
+            seq_hex = esp_layer.get("esp.sequence_raw", [""])[0]
+            src_ip_hex = ip_layer.get("ip.src_raw", [""])[0]
+            dst_ip_hex = ip_layer.get("ip.dst_raw", [""])[0]
+
             try:
-                # 清理十六进制数据
-                spi = int(spi_hex.strip().replace('0x', ''), 16) if spi_hex.strip() else 0
-                seq = int(seq_hex.strip().replace('0x', ''), 16) if seq_hex.strip() else 0
-                data = bytes.fromhex(data_hex.replace(':', '')) if data_hex else b''
-                if len(data) >= 16:
-                    truncated_data = data[16:]
-                else:
-                    continue
+                # 转换字段
+                spi = int(spi_hex.replace('0x', ''), 16) if spi_hex else 0
+                seq = int(seq_hex.replace('0x', ''), 16) if seq_hex else 0
+                data = bytes.fromhex(esp_raw.replace(':', ''))[8:] if esp_raw else b''
+                src_ip = self.hex_to_ip(src_ip_hex)  # 转换IP
+                dst_ip = self.hex_to_ip(dst_ip_hex)
 
                 self.encrypted_data.append({
                     'proto': 'ESP',
@@ -549,11 +557,28 @@ class PCAPParserApp:
                     'seq': seq,
                     'src_ip': src_ip,
                     'dst_ip': dst_ip,
-                    'data': truncated_data
+                    'data': data
                 })
-            except ValueError as e:
+            except (ValueError, KeyError) as e:
                 print(f"解析ESP数据失败: {e}")
                 continue
+
+    def hex_to_ip(self,hex_str):
+        # 去除前缀和分隔符（如0x、:）
+        hex_clean = hex_str.replace('0x', '').replace(':', '').strip()
+
+        try:
+            # 根据长度判断 IPv4/IPv6
+            if len(hex_clean) == 8:  # IPv4（4字节）
+                addr_bytes = bytes.fromhex(hex_clean)
+                return socket.inet_ntop(socket.AF_INET, addr_bytes)
+            elif len(hex_clean) == 32:  # IPv6（16字节）
+                addr_bytes = bytes.fromhex(hex_clean)
+                return socket.inet_ntop(socket.AF_INET6, addr_bytes)
+            else:
+                return hex_str  # 无法识别则返回原值
+        except (ValueError, TypeError, OSError):
+            return hex_str  # 转换失败时返回原值
 
     def update_progress(self, current, total):
         # 由于tshark无法获取进度，保持原有逻辑
