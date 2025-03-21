@@ -6,6 +6,9 @@
 Obtain encryption data, cipher suites, and certificate information from pcap packets.  
 Install wireshark and make sure that the tshark directory is D:/wireshark/tshark.exe  
 Or add tshark to an environment variable    
+
+### 来访人次：
+[![Moe Counter](https://count.getloli.com/@GetPcapEncrypt?name=GetPcapEncrypt&theme=moebooru&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto)](https://github.com/Draina233)
   
 ### 使用示例： 
 ![image](https://github.com/user-attachments/assets/f3074c17-0c4f-46c8-9497-eba355ba0e25)
