@@ -139,7 +139,44 @@ class PCAPParserApp:
         self.tcp_streams = {}
         self.seen_cert_hashes = set()
         self.current_file_path = None
-        self.tshark_path = r"D:\Wireshark\tshark.exe"
+        self.tshark_path = self.get_tshark_path()
+
+    def get_tshark_path(self):
+        # 获取当前脚本所在目录
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # 构造相对路径
+        relative_path = os.path.join(current_dir, "Wireshark", "tshark.exe")
+        # 如果相对路径存在，则使用相对路径
+        if os.path.exists(relative_path):
+            return relative_path
+        # 检查环境变量中是否有 tshark
+        elif 'TSHARK_PATH' in os.environ:
+            tshark_env_path = os.environ['TSHARK_PATH']
+            if os.path.exists(tshark_env_path):
+                return tshark_env_path
+    """若生成exe，使用下方代码替换上方函数寻找tshark路径
+    def get_tshark_path(self):
+        # 获取当前程序所在目录（兼容打包后的 exe 文件）
+        if getattr(sys, 'frozen', False):
+            # 如果是打包后的 exe 文件，获取 exe 的目录
+            current_dir = os.path.dirname(sys.executable)
+        else:
+            # 如果是源代码运行，获取脚本所在目录
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # 构造相对路径
+        relative_path = os.path.join(current_dir, "Wireshark", "tshark.exe")
+        
+        # 如果相对路径存在，则使用相对路径
+        if os.path.exists(relative_path):
+            return relative_path
+        # 检查环境变量中是否有 tshark
+        elif 'TSHARK_PATH' in os.environ:
+            tshark_env_path = os.environ['TSHARK_PATH']
+            if os.path.exists(tshark_env_path):
+                return tshark_env_path
+    """
+
 
     def create_widgets(self):
         main_paned = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
@@ -392,12 +429,18 @@ class PCAPParserApp:
 
     def run_tshark_command(self, command):
         try:
+            # 在 Windows 上隐藏命令行窗口
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+
             result = subprocess.run(
                 command,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=True,
-                text=True
+                text=True,
+                startupinfo=startupinfo  # 添加这一行来隐藏窗口
             )
             return result.stdout.splitlines()
         except subprocess.CalledProcessError as e:
@@ -750,5 +793,6 @@ class PCAPParserApp:
 
 if __name__ == "__main__":
     root = tk.Tk()
+    root.iconbitmap('icon.ico')
     app = PCAPParserApp(root)
     root.mainloop()
